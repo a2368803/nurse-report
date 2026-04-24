@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>護理讀書報告生成器</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script>
+    // Redirect to setup if API key not configured
+    fetch('/api/status').then(r=>r.json()).then(d=>{ if(!d.configured) location.href='/setup.html'; });
+  </script>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <header class="app-header">
+      <a href="/setup.html" class="settings-btn" title="設定 API Key">⚙️</a>
+      <div class="header-icon">📋</div>
+      <h1 class="app-title">護理讀書報告生成器</h1>
+      <p class="app-subtitle">Nursing Reading Report Generator</p>
+    </header>
+
+    <main class="main-content" id="formSection">
+      <form id="reportForm" enctype="multipart/form-data">
+
+        <section class="card">
+          <h2 class="section-title"><span class="icon">📷</span> 上傳圖片或文字</h2>
+          <p class="section-desc">可多張上傳，長按拖曳或點 ↑↓ 調整頁面順序</p>
+          <label class="upload-zone" id="uploadZone" for="fileInput">
+            <div class="upload-icon">⬆️</div>
+            <div class="upload-text">點擊選擇檔案<br><span class="upload-hint">或拖曳至此</span></div>
+            <div class="upload-formats">支援：JPG、PNG、GIF、WEBP、TXT</div>
+            <input type="file" id="fileInput" multiple accept="image/*,.txt" class="file-input" />
+          </label>
+          <!-- Sortable file list -->
+          <div id="sortableList" class="sortable-list hidden"></div>
+          <button type="button" class="btn-add-more hidden" id="btnAddMore" onclick="document.getElementById('fileInput').click()">
+            ＋ 繼續新增圖片
+          </button>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title"><span class="icon">✏️</span> 或直接貼上文字內容</h2>
+          <p class="section-desc">可貼上文章、摘要或護理相關資料（中英文均可）</p>
+          <textarea id="textContent" name="text_content" class="text-input"
+            placeholder="在此貼上或輸入文章內容…&#10;&#10;例如：論文摘要、期刊文章、護理指引等" rows="8"></textarea>
+        </section>
+
+        <section class="card options-card">
+          <h2 class="section-title"><span class="icon">⚙️</span> 報告說明</h2>
+          <div class="info-list">
+            <div class="info-item"><span class="info-dot green"></span><span>Part 1：完整中文翻譯（不省略任何段落）</span></div>
+            <div class="info-item"><span class="info-dot blue"></span><span>Part 2：英文心得 + 臨床護理建議</span></div>
+            <div class="info-item"><span class="info-dot purple"></span><span>Part 3：APA 第7版參考資料</span></div>
+            <div class="info-item"><span class="info-dot orange"></span><span>最終可下載 Word 檔（.docx）</span></div>
+          </div>
+        </section>
+
+        <button type="submit" class="btn-generate" id="generateBtn">
+          <span class="btn-icon">✨</span>
+          <span id="btnText">生成讀書報告</span>
+        </button>
+
+      </form>
+    </main>
+
+    <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <p class="loading-title">AI 正在生成報告中…</p>
+        <p class="loading-sub">多張圖片需要較長時間，請耐心等候</p>
+        <div class="progress-log" id="progressLog">
+          <div class="log-item active">⏳ 準備中...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="report-section hidden" id="reportSection">
+      <div class="report-header-bar">
+        <h2 class="report-title-main" id="reportTitle">讀書報告</h2>
+        <p class="report-title-zh" id="reportTitleZh"></p>
+        <p class="report-meta" id="reportMeta"></p>
+      </div>
+
+      <div class="report-card">
+        <h3 class="report-section-heading summary-heading"><span>📄</span> 原文摘要</h3>
+        <div class="report-body" id="sourceSummary"></div>
+      </div>
+
+      <div class="report-card">
+        <h3 class="report-section-heading part1-heading"><span>🌐</span> Part 1：全文翻譯</h3>
+        <div class="report-body" id="part1Content"></div>
+      </div>
+
+      <div class="report-card">
+        <h3 class="report-section-heading part2-heading"><span>💡</span> Part 2：Reflection &amp; Clinical Application</h3>
+        <div class="report-body english-text" id="part2Content"></div>
+      </div>
+
+      <div class="report-card">
+        <h3 class="report-section-heading part2zh-heading"><span>💬</span> Part 2（中文）：心得與臨床應用</h3>
+        <div class="report-body" id="part2ZhContent"></div>
+      </div>
+
+      <div class="report-card">
+        <h3 class="report-section-heading part3-heading"><span>📚</span> Part 3：References (APA 7th Edition)</h3>
+        <ol class="reference-list" id="part3Content"></ol>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn-download" id="downloadBtn" onclick="downloadReport()">
+          <span>⬇️</span> 下載 Word 檔
+        </button>
+        <button class="btn-reset" onclick="resetForm()">
+          <span>🔄</span> 重新生成
+        </button>
+      </div>
+    </div>
+
+    <div class="toast-error hidden" id="errorToast">
+      <span class="toast-icon">⚠️</span>
+      <span id="errorMessage">發生錯誤，請重試</span>
+    </div>
+
+  </div>
+
+  <script>
+    let currentReport = null;
+    let orderedFiles = [];   // master ordered array of File objects
+    let dragSrcIdx = null;
+
+    // ── Sortable list rendering ──
+    function renderSortableList() {
+      const list = document.getElementById("sortableList");
+      const addBtn = document.getElementById("btnAddMore");
+      if (!orderedFiles.length) {
+        list.classList.add("hidden");
+        addBtn.classList.add("hidden");
+        return;
+      }
+      list.classList.remove("hidden");
+      addBtn.classList.remove("hidden");
+      list.innerHTML = "";
+      orderedFiles.forEach((file, idx) => {
+        const item = document.createElement("div");
+        item.className = "sort-item";
+        item.draggable = true;
+        item.dataset.idx = idx;
+
+        // drag handle
+        const handle = document.createElement("span");
+        handle.className = "sort-handle";
+        handle.textContent = "☰";
+        item.appendChild(handle);
+
+        // page number
+        const num = document.createElement("span");
+        num.className = "sort-num";
+        num.textContent = idx + 1;
+        item.appendChild(num);
+
+        // thumbnail
+        if (file.type.startsWith("image/")) {
+          const img = document.createElement("img");
+          img.className = "sort-thumb";
+          img.src = URL.createObjectURL(file);
+          item.appendChild(img);
+        } else {
+          const icon = document.createElement("div");
+          icon.className = "sort-file-icon";
+          icon.textContent = "📄";
+          item.appendChild(icon);
+        }
+
+        // file name
+        const name = document.createElement("span");
+        name.className = "sort-name";
+        name.textContent = file.name;
+        item.appendChild(name);
+
+        // ↑↓ buttons
+        const btns = document.createElement("div");
+        btns.className = "sort-btns";
+        const upBtn = document.createElement("button");
+        upBtn.type = "button"; upBtn.className = "sort-btn"; upBtn.textContent = "↑";
+        upBtn.disabled = idx === 0;
+        upBtn.onclick = () => moveItem(idx, -1);
+        const downBtn = document.createElement("button");
+        downBtn.type = "button"; downBtn.className = "sort-btn"; downBtn.textContent = "↓";
+        downBtn.disabled = idx === orderedFiles.length - 1;
+        downBtn.onclick = () => moveItem(idx, 1);
+        btns.appendChild(upBtn);
+        btns.appendChild(downBtn);
+        item.appendChild(btns);
+
+        // delete button
+        const del = document.createElement("button");
+        del.type = "button"; del.className = "sort-del"; del.textContent = "✕";
+        del.onclick = () => removeItem(idx);
+        item.appendChild(del);
+
+        // drag events
+        item.addEventListener("dragstart", e => {
+          dragSrcIdx = idx;
+          e.dataTransfer.effectAllowed = "move";
+          setTimeout(() => item.classList.add("dragging"), 0);
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("dragging");
+          list.querySelectorAll(".sort-item").forEach(i => i.classList.remove("drag-over-top", "drag-over-bottom"));
+        });
+        item.addEventListener("dragover", e => {
+          e.preventDefault();
+          if (dragSrcIdx === null || dragSrcIdx === idx) return;
+          item.classList.remove("drag-over-top", "drag-over-bottom");
+          const rect = item.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          item.classList.add(e.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+        });
+        item.addEventListener("dragleave", () => item.classList.remove("drag-over-top", "drag-over-bottom"));
+        item.addEventListener("drop", e => {
+          e.preventDefault();
+          item.classList.remove("drag-over-top", "drag-over-bottom");
+          if (dragSrcIdx === null || dragSrcIdx === idx) return;
+          const rect = item.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          const insertBefore = e.clientY < mid;
+          const moved = orderedFiles.splice(dragSrcIdx, 1)[0];
+          let target = idx;
+          if (dragSrcIdx < idx) target = insertBefore ? idx - 1 : idx;
+          else target = insertBefore ? idx : idx + 1;
+          orderedFiles.splice(target, 0, moved);
+          dragSrcIdx = null;
+          renderSortableList();
+        });
+
+        list.appendChild(item);
+      });
+    }
+
+    function moveItem(idx, dir) {
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= orderedFiles.length) return;
+      const tmp = orderedFiles[idx];
+      orderedFiles[idx] = orderedFiles[newIdx];
+      orderedFiles[newIdx] = tmp;
+      renderSortableList();
+    }
+
+    function removeItem(idx) {
+      orderedFiles.splice(idx, 1);
+      renderSortableList();
+    }
+
+    document.getElementById("fileInput").addEventListener("change", function () {
+      Array.from(this.files).forEach(f => orderedFiles.push(f));
+      this.value = "";   // reset so same file can be re-added
+      renderSortableList();
+    });
+
+    const uploadZone = document.getElementById("uploadZone");
+    uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+    uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+    uploadZone.addEventListener("drop", e => {
+      e.preventDefault();
+      uploadZone.classList.remove("drag-over");
+      Array.from(e.dataTransfer.files).forEach(f => orderedFiles.push(f));
+      renderSortableList();
+    });
+
+    function addLog(msg) {
+      const log = document.getElementById("progressLog");
+      // Mark previous item as done
+      const prev = log.querySelector(".log-item.active");
+      if (prev) { prev.classList.remove("active"); prev.classList.add("done"); }
+      const item = document.createElement("div");
+      item.className = "log-item active";
+      item.textContent = msg;
+      log.appendChild(item);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function startProgressStream(progressId) {
+      const es = new EventSource(`/progress/${progressId}`);
+      es.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        if (d.done) { es.close(); return; }
+        if (d.msg) addLog(d.msg);
+      };
+      es.onerror = () => es.close();
+      return es;
+    }
+
+    document.getElementById("reportForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const text = document.getElementById("textContent").value.trim();
+      if (!text && !orderedFiles.length) { showError("請上傳圖檔或輸入文字內容後再生成"); return; }
+
+      // Reset progress log
+      document.getElementById("progressLog").innerHTML = '<div class="log-item active">⏳ 連線中...</div>';
+      document.getElementById("formSection").classList.add("hidden");
+      document.getElementById("loadingOverlay").classList.remove("hidden");
+      document.getElementById("reportSection").classList.add("hidden");
+
+      // Generate unique progress ID and start SSE
+      const progressId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const formData = new FormData();
+      formData.append("text_content", document.getElementById("textContent").value.trim());
+      formData.append("progress_id", progressId);
+      orderedFiles.forEach(f => formData.append("files", f));
+      const es = startProgressStream(progressId);
+
+      try {
+        const resp = await fetch("/generate", { method: "POST", body: formData });
+        const data = await resp.json();
+        es.close();
+        if (data.error) {
+          showError(data.error);
+          document.getElementById("formSection").classList.remove("hidden");
+          document.getElementById("loadingOverlay").classList.add("hidden");
+          return;
+        }
+        currentReport = data.report;
+        renderReport(data.report);
+      } catch (err) {
+        es.close();
+        showError("網路錯誤，請確認伺服器正常運作");
+        document.getElementById("formSection").classList.remove("hidden");
+        document.getElementById("loadingOverlay").classList.add("hidden");
+      }
+    });
+
+    function renderReport(r) {
+      document.getElementById("loadingOverlay").classList.add("hidden");
+      document.getElementById("reportSection").classList.remove("hidden");
+      document.getElementById("reportTitle").textContent = r.title || "Nursing Reading Report";
+      document.getElementById("reportTitleZh").textContent = r.title_zh || "";
+      document.getElementById("reportMeta").textContent = "Generated: " + (r.generated_at || "");
+      document.getElementById("sourceSummary").innerHTML = nl2p(r.source_summary || "");
+      document.getElementById("part1Content").innerHTML = nl2p(r.part1_translation || "");
+      document.getElementById("part2Content").innerHTML = nl2p(r.part2_reflection || "");
+      document.getElementById("part2ZhContent").innerHTML = nl2p(r.part2_zh || "");
+      const refList = document.getElementById("part3Content");
+      refList.innerHTML = "";
+      (r.part3_references || []).forEach(ref => {
+        const li = document.createElement("li");
+        li.textContent = ref;
+        refList.appendChild(li);
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function nl2p(text) {
+      return text.split("\n").filter(l => l.trim()).map(l => `<p>${esc(l)}</p>`).join("");
+    }
+    function esc(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    async function downloadReport() {
+      if (!currentReport) return;
+      const btn = document.getElementById("downloadBtn");
+      btn.disabled = true;
+      btn.innerHTML = "<span>⏳</span> 生成中…";
+      try {
+        const resp = await fetch("/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentReport),
+        });
+        if (!resp.ok) throw new Error("失敗");
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = (currentReport.title || "nursing_report").replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"_") + ".docx";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        showError("下載失敗，請重試");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<span>⬇️</span> 下載 Word 檔";
+      }
+    }
+
+    function resetForm() {
+      currentReport = null;
+      orderedFiles = [];
+      document.getElementById("reportSection").classList.add("hidden");
+      document.getElementById("formSection").classList.remove("hidden");
+      document.getElementById("reportForm").reset();
+      renderSortableList();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function showError(msg) {
+      document.getElementById("errorMessage").textContent = msg;
+      const t = document.getElementById("errorToast");
+      t.classList.remove("hidden");
+      setTimeout(() => t.classList.add("hidden"), 5000);
+    }
+  </script>
+</body>
+</html>
