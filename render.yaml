@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: nurse-report
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false

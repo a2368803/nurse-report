@@ -31,6 +31,10 @@ const upload = multer({
 });
 
 function getApiKey() {
+  // Cloud env var takes priority (Render, Railway, etc.)
+  const envKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || "";
+  if (envKey && !envKey.startsWith("your_")) return envKey;
+  // Fallback: read local .env file (for local development)
   try {
     const raw = fs.readFileSync(ENV_PATH, "utf-8");
     const match = raw.match(/(?:GROQ_API_KEY|GEMINI_API_KEY)\s*=\s*(.+)/);
@@ -351,6 +355,9 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n✅ 護理讀書報告生成器已啟動`);
   console.log(`   網址：http://localhost:${PORT}`);
   console.log(`   按 Ctrl+C 停止\n`);
-  const { exec } = require("child_process");
-  exec(`cmd /c start "" "http://localhost:${PORT}"`);
+  // Auto-open browser only on local Windows
+  if (process.platform === "win32" && !process.env.RENDER) {
+    const { exec } = require("child_process");
+    exec(`cmd /c start "" "http://localhost:${PORT}"`);
+  }
 });
