@@ -315,9 +315,25 @@
         const data = await resp.json();
         es.close();
         if (data.error) {
+          // Show error in progress log for full visibility
+          const log = document.getElementById("progressLog");
+          const errItem = document.createElement("div");
+          errItem.className = "log-item";
+          errItem.style.cssText = "color:#ef4444;font-weight:600;white-space:pre-wrap;word-break:break-all;";
+          errItem.textContent = "❌ " + data.error;
+          log.appendChild(errItem);
+          log.scrollTop = log.scrollHeight;
+          // Also show toast
           showError(data.error);
-          document.getElementById("formSection").classList.remove("hidden");
-          document.getElementById("loadingOverlay").classList.add("hidden");
+          // Keep loading overlay open so user can read full error
+          const closeBtn = document.createElement("button");
+          closeBtn.textContent = "關閉";
+          closeBtn.style.cssText = "margin-top:12px;padding:8px 24px;background:#ef4444;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;";
+          closeBtn.onclick = () => {
+            document.getElementById("formSection").classList.remove("hidden");
+            document.getElementById("loadingOverlay").classList.add("hidden");
+          };
+          document.querySelector(".loading-card").appendChild(closeBtn);
           return;
         }
         currentReport = data.report;
