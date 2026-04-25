@@ -45,29 +45,24 @@ function getApiKey() {
 
 // ===== Prompts =====
 
-const PROMPT_TRANSLATE_CHUNK = `你是頂尖的醫護學術中英翻譯專家。請將以下英文段落翻譯成優美流暢的繁體中文。
+const PROMPT_TRANSLATE_CHUNK = `你是台灣頂尖護理學術期刊的資深中文編輯，同時精通英中醫學翻譯。請將以下英文段落翻譯成高品質繁體中文，達到台灣護理期刊發表水準。
 
-翻譯規範：
-・完整保留每一句話的意思，絕對不可省略任何資訊
-・以中文讀者的閱讀習慣重新組織句子結構，避免英文語序直譯
-・專業術語首次出現時標示英文原文，格式：中文詞（English term）
-・保留原文的段落分隔
-・語氣自然學術，讀起來像本來就是中文撰寫的護理期刊文章
-・只輸出翻譯結果純文字，不加任何說明、標題或評語
+【翻譯標準】
+① 讀起來像台灣護理研究者以中文原創撰寫，完全沒有翻譯腔
+② 依中文語感重組句子：主動語態優先、適當拆分英文長句、連接詞與轉折語符合中文習慣（因此、然而、此外、由此可知）
+③ 專業術語首次出現加注英文：心搏過速（tachycardia）
+④ 完整保留原文每一句話的資訊，不省略、不增添
+⑤ 保留原文段落分隔
+
+【避免以下常見錯誤】
+✗ 主詞重複照搬英文（「這個研究」→「本研究」）
+✗ 英文分詞片語直譯（"Considering the results..." →「考量上述結果，…」而非「考慮到結果…」）
+✗ 過度使用「的」字
+✗ 被動語態堆疊（「被發現」→「發現」）
+
+只輸出翻譯結果純文字，不加任何說明或標題。
 
 原文：
-`;
-
-const PROMPT_POLISH = `你是繁體中文學術文章潤稿專家，擅長將翻譯文字潤飾得流暢自然。請對以下護理學術翻譯文字進行潤稿。
-
-潤稿規範：
-・消除翻譯腔，讓語句更符合中文表達習慣
-・改善句子連貫性，使段落之間銜接順暢
-・保持學術嚴謹性，不可更動專業術語的意思
-・完整保留所有原始內容，不可增加或刪減任何資訊
-・只輸出潤稿後的純文字，不加任何說明
-
-待潤稿文字：
 `;
 
 const PROMPT_TITLE = `根據以下護理文章的中文翻譯，回傳純 JSON（不加 markdown）：
@@ -227,26 +222,8 @@ async function generateReport(textContent, imagePaths, sendProgress) {
     if (i < chunks.length - 1) await sleep(3000);
   }
 
-  const roughTranslation = translatedParts.join("\n\n");
-  emit(`✅ 初稿翻譯完成（共 ${roughTranslation.length} 字）`);
-
-  // ── Step 2.5: Polish translation ──
-  await sleep(3000);
-  const polishChunks = splitChunks(roughTranslation, 1200);
-  emit(`✨ 潤稿中（共 ${polishChunks.length} 段）...`);
-  const polishedParts = [];
-  for (let i = 0; i < polishChunks.length; i++) {
-    emit(`  → 潤稿第 ${i + 1}/${polishChunks.length} 段`);
-    const polished = await callGroqText(
-      groq, fastModel,
-      PROMPT_POLISH + polishChunks[i],
-      1800, emit, `潤稿第 ${i+1} 段`
-    );
-    polishedParts.push(polished);
-    if (i < polishChunks.length - 1) await sleep(3000);
-  }
-  const fullTranslation = polishedParts.join("\n\n");
-  emit(`✅ 潤稿完成（共 ${fullTranslation.length} 字）`);
+  const fullTranslation = translatedParts.join("\n\n");
+  emit(`✅ 翻譯完成（共 ${fullTranslation.length} 字）`);
 
   // ── Step 3: Title + summary ──
   await sleep(3000);
