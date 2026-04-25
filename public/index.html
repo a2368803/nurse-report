@@ -104,6 +104,7 @@
 
       <div class="report-card">
         <h3 class="report-section-heading part3-heading"><span>📚</span> Part 3：References (APA 7th Edition)</h3>
+        <div id="refNotice"></div>
         <ol class="reference-list" id="part3Content"></ol>
       </div>
 
@@ -356,6 +357,12 @@
       document.getElementById("part1Content").innerHTML = nl2p(r.part1_translation || "");
       document.getElementById("part2Content").innerHTML = nl2p(r.part2_reflection || "");
       document.getElementById("part2ZhContent").innerHTML = nl2p(r.part2_zh || "");
+      const refNotice = document.getElementById("refNotice");
+      if (r.refs_are_real) {
+        refNotice.innerHTML = `<div class="ref-notice real">✅ 以下參考資料取自原文真實引用，已格式化為 APA 第7版。建議仍點擊 DOI 確認格式正確。</div>`;
+      } else {
+        refNotice.innerHTML = `<div class="ref-notice ai">⚠️ 原文未包含參考文獻清單，以下為 AI 依主題生成的建議引用，<strong>請務必逐筆核實 DOI 是否存在後再使用</strong>。</div>`;
+      }
       const refList = document.getElementById("part3Content");
       refList.innerHTML = "";
       (r.part3_references || []).forEach(ref => {

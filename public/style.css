@@ -164,6 +164,9 @@ body {
 .report-body p:last-child { margin-bottom: 0; }
 .english-text p { font-family: "Times New Roman", Georgia, serif; font-size: 14.5px; }
 
+.ref-notice { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; line-height: 1.6; }
+.ref-notice.real { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.ref-notice.ai { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .reference-list { padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
 .reference-list li { font-size: 13px; line-height: 1.7; color: var(--text); padding-left: 6px; font-family: "Times New Roman", Georgia, serif; }
 
