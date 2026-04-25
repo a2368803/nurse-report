@@ -171,7 +171,8 @@ async function generateReport(textContent, imagePaths, sendProgress) {
 
   const groq = new Groq({ apiKey: key });
   const visionModel = "meta-llama/llama-4-scout-17b-16e-instruct";
-  const textModel   = "llama-3.3-70b-versatile";
+  const textModel   = "llama-3.3-70b-versatile";  // 100K TPD — used for translation & reflection
+  const fastModel   = "llama-3.1-8b-instant";     // 500K TPD — used for polishing & title
   const extractPrompt = "請完整、逐字識別圖片中的所有文字內容，保留原始段落結構與標點，只輸出純文字，不要任何說明或評論。";
 
   // ── Step 1: Extract text from each image SEPARATELY ──
@@ -237,7 +238,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
   for (let i = 0; i < polishChunks.length; i++) {
     emit(`  → 潤稿第 ${i + 1}/${polishChunks.length} 段`);
     const polished = await callGroqText(
-      groq, textModel,
+      groq, fastModel,
       PROMPT_POLISH + polishChunks[i],
       1800, emit, `潤稿第 ${i+1} 段`
     );
@@ -250,7 +251,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
   // ── Step 3: Title + summary ──
   await sleep(3000);
   emit("📝 生成標題與摘要...");
-  const titleData = await callGroqJSON(groq, textModel, PROMPT_TITLE + fullTranslation.slice(0, 1500), 500, emit, "標題生成");
+  const titleData = await callGroqJSON(groq, fastModel, PROMPT_TITLE + fullTranslation.slice(0, 1500), 500, emit, "標題生成");
 
   // ── Step 4: Reflection + References ──
   await sleep(3000);
