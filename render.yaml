@@ -6,4 +6,4 @@ services:
     startCommand: node server.js
     envVars:
       - key: GROQ_API_KEY
-        value: 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
+        sync: false
