@@ -110,6 +110,12 @@ function safeParseJSON(raw) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function isTPDError(err) {
+  const msg = (err?.message || "").toLowerCase();
+  return (err?.status === 429 || err?.statusCode === 429) &&
+    (msg.includes("per day") || msg.includes(" tpd") || msg.includes("daily"));
+}
+
 // Split text into chunks by paragraph, each chunk ≤ maxChars
 function splitChunks(text, maxChars = 900) {
   const paras = text.split(/\n+/).filter(p => p.trim());
@@ -136,6 +142,8 @@ async function groqRetry(fn, emit, label, maxRetries = 3) {
       const msg = (err?.message || "").toLowerCase();
       const isRateLimit = status === 429 || msg.includes("rate") || msg.includes("limit") || msg.includes("quota");
       const isOverload  = status === 503 || status === 500 || msg.includes("overload") || msg.includes("unavailable");
+      // TPD = daily token limit — waiting 60s won't help, pass through for fallback handling
+      if (isTPDError(err)) throw err;
       if ((isRateLimit || isOverload) && attempt < maxRetries) {
         const wait = isRateLimit ? 60000 : 15000;
         if (emit) emit(`⏳ ${label} 遇到限流，等待 ${wait/1000}s 後重試（第 ${attempt+1} 次）...`);
@@ -161,6 +169,24 @@ async function callGroqText(groq, model, prompt, maxTokens, emit, label) {
 
 async function callGroqJSON(groq, model, prompt, maxTokens, emit, label) {
   const raw = await callGroqText(groq, model, prompt, maxTokens, emit, label);
+  return safeParseJSON(raw);
+}
+
+// Automatically fall back to `fallback` model when primary hits daily TPD limit
+async function callGroqTextFallback(groq, model, fallback, prompt, maxTokens, emit, label) {
+  try {
+    return await callGroqText(groq, model, prompt, maxTokens, emit, label);
+  } catch (err) {
+    if (isTPDError(err) && fallback && fallback !== model) {
+      if (emit) emit(`⚠️ 70b 日用量已達上限，自動切換至 8b 繼續生成...`);
+      return await callGroqText(groq, fallback, prompt, maxTokens, emit, label + "(8b)");
+    }
+    throw err;
+  }
+}
+
+async function callGroqJSONFallback(groq, model, fallback, prompt, maxTokens, emit, label) {
+  const raw = await callGroqTextFallback(groq, model, fallback, prompt, maxTokens, emit, label);
   return safeParseJSON(raw);
 }
 
@@ -219,14 +245,22 @@ async function generateReport(textContent, imagePaths, sendProgress, isPremium =
   const chunks = splitChunks(rawContent, 800);
   emit(`🌐 開始翻譯（共 ${chunks.length} 段）...`);
   const translatedParts = [];
+  let currentTransModel = transModel;
 
   for (let i = 0; i < chunks.length; i++) {
     emit(`  → 翻譯第 ${i + 1}/${chunks.length} 段`);
-    const translated = await callGroqText(
-      groq, transModel,
-      PROMPT_TRANSLATE_CHUNK + chunks[i],
-      2000, emit, `翻譯第 ${i+1} 段`
-    );
+    let translated;
+    try {
+      translated = await callGroqText(groq, currentTransModel, PROMPT_TRANSLATE_CHUNK + chunks[i], 2000, emit, `翻譯第 ${i+1} 段`);
+    } catch (err) {
+      if (isTPDError(err) && currentTransModel !== fastModel) {
+        emit(`⚠️ 70b 日用量已達上限，翻譯自動切換至 8b 普通模式...`);
+        currentTransModel = fastModel;
+        translated = await callGroqText(groq, currentTransModel, PROMPT_TRANSLATE_CHUNK + chunks[i], 2000, emit, `翻譯第 ${i+1} 段(8b)`);
+      } else {
+        throw err;
+      }
+    }
     translatedParts.push(translated);
     if (i < chunks.length - 1) await sleep(3000);
   }
@@ -242,7 +276,7 @@ async function generateReport(textContent, imagePaths, sendProgress, isPremium =
   // ── Step 4: Reflection + References ──
   await sleep(3000);
   emit("💡 撰寫心得與 APA 參考資料...");
-  const part2 = await callGroqJSON(groq, textModel, PROMPT_REFLECTION + rawContent.slice(0, 2500), 4000, emit, "心得生成");
+  const part2 = await callGroqJSONFallback(groq, textModel, fastModel, PROMPT_REFLECTION + rawContent.slice(0, 2500), 4000, emit, "心得生成");
 
   emit("✅ 報告生成完成！");
 
