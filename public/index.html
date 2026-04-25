@@ -46,6 +46,30 @@
             placeholder="在此貼上或輸入文章內容…&#10;&#10;例如：論文摘要、期刊文章、護理指引等" rows="8"></textarea>
         </section>
 
+        <section class="card">
+          <h2 class="section-title"><span class="icon">🎯</span> 翻譯模式</h2>
+          <div class="mode-selector">
+            <label class="mode-card selected" id="modeNormal">
+              <input type="radio" name="trans_mode" value="normal" checked hidden />
+              <div class="mode-top">
+                <span class="mode-badge normal">普通</span>
+                <span class="mode-speed">⚡ 速度較快</span>
+              </div>
+              <div class="mode-title">普通翻譯</div>
+              <div class="mode-desc">適合一般護理報告，每日可生成多份</div>
+            </label>
+            <label class="mode-card" id="modePremium">
+              <input type="radio" name="trans_mode" value="premium" hidden />
+              <div class="mode-top">
+                <span class="mode-badge premium">高級</span>
+                <span class="mode-speed">🏆 品質更精準</span>
+              </div>
+              <div class="mode-title">高級翻譯</div>
+              <div class="mode-desc">大型語言模型翻譯，適合重要報告，每日約3份</div>
+            </label>
+          </div>
+        </section>
+
         <section class="card options-card">
           <h2 class="section-title"><span class="icon">⚙️</span> 報告說明</h2>
           <div class="info-list">
@@ -259,6 +283,14 @@
       renderSortableList();
     });
 
+    // Mode selector
+    document.querySelectorAll(".mode-card").forEach(card => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".mode-card").forEach(c => c.classList.remove("selected"));
+        card.classList.add("selected");
+      });
+    });
+
     const uploadZone = document.getElementById("uploadZone");
     uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
     uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
@@ -308,6 +340,7 @@
       const formData = new FormData();
       formData.append("text_content", document.getElementById("textContent").value.trim());
       formData.append("progress_id", progressId);
+      formData.append("trans_mode", document.querySelector('input[name="trans_mode"]:checked').value);
       orderedFiles.forEach(f => formData.append("files", f));
       const es = startProgressStream(progressId);
 

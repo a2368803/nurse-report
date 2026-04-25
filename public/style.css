@@ -119,6 +119,17 @@ body {
 .info-dot.purple { background: var(--purple); }
 .info-dot.orange { background: var(--orange); }
 
+.mode-selector { display: flex; gap: 12px; margin-top: 4px; }
+.mode-card { flex: 1; border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+.mode-card.selected { border-color: var(--primary-light); background: var(--primary-pale); }
+.mode-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mode-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.mode-badge.normal { background: #e2e8f0; color: #475569; }
+.mode-badge.premium { background: linear-gradient(135deg, #7c3aed, #2d7dd2); color: #fff; }
+.mode-speed { font-size: 11px; color: var(--text-muted); }
+.mode-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.mode-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
 .btn-generate {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   width: calc(100% - 32px); margin: 4px 16px 0; padding: 16px;

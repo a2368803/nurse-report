@@ -165,16 +165,18 @@ async function callGroqJSON(groq, model, prompt, maxTokens, emit, label) {
 }
 
 // generateReport accepts an optional SSE writer for real-time progress
-async function generateReport(textContent, imagePaths, sendProgress) {
+async function generateReport(textContent, imagePaths, sendProgress, isPremium = false) {
   const emit = (msg) => { console.log(msg); if (sendProgress) sendProgress(msg); };
 
   const key = getApiKey();
   if (!key) throw new Error("尚未設定 API Key，請至設定頁面輸入");
 
   const groq = new Groq({ apiKey: key });
-  const visionModel = "meta-llama/llama-4-scout-17b-16e-instruct";
-  const textModel   = "llama-3.3-70b-versatile";  // 100K TPD — used for translation & reflection
-  const fastModel   = "llama-3.1-8b-instant";     // 500K TPD — used for polishing & title
+  const visionModel  = "meta-llama/llama-4-scout-17b-16e-instruct";
+  const textModel    = "llama-3.3-70b-versatile";  // 100K TPD
+  const fastModel    = "llama-3.1-8b-instant";     // 500K TPD
+  const transModel   = isPremium ? textModel : fastModel;
+  emit(isPremium ? "🏆 高級翻譯模式（70b）" : "⚡ 普通翻譯模式（8b）");
   const extractPrompt = "請完整、逐字識別圖片中的所有文字內容，保留原始段落結構與標點，只輸出純文字，不要任何說明或評論。";
 
   // ── Step 1: Extract text from each image SEPARATELY ──
@@ -221,7 +223,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
   for (let i = 0; i < chunks.length; i++) {
     emit(`  → 翻譯第 ${i + 1}/${chunks.length} 段`);
     const translated = await callGroqText(
-      groq, fastModel,
+      groq, transModel,
       PROMPT_TRANSLATE_CHUNK + chunks[i],
       2000, emit, `翻譯第 ${i+1} 段`
     );
@@ -346,6 +348,7 @@ const progressClients = new Map();
 app.post("/generate", upload.array("files", 10), async (req, res) => {
   const textContent = (req.body.text_content || "").trim();
   const progressId  = req.body.progress_id || "";
+  const isPremium   = req.body.trans_mode === "premium";
   const files = req.files || [];
   if (!textContent && !files.length) return res.status(400).json({ error: "請上傳圖檔或輸入文字內容" });
 
@@ -363,7 +366,7 @@ app.post("/generate", upload.array("files", 10), async (req, res) => {
   };
 
   try {
-    const report = await generateReport(extraText || null, imagePaths, sendProgress);
+    const report = await generateReport(extraText || null, imagePaths, sendProgress, isPremium);
     res.json({ success: true, report });
   } catch (err) {
     console.error(err);
