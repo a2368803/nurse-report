@@ -317,6 +317,22 @@ app.get("/api/status", (req, res) => {
   res.json({ configured: !!getApiKey() });
 });
 
+app.get("/api/test-groq", async (req, res) => {
+  const key = getApiKey();
+  if (!key) return res.json({ ok: false, error: "No API key found" });
+  try {
+    const groq = new Groq({ apiKey: key });
+    const r = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: "Reply with the word OK only." }],
+      max_tokens: 10,
+    });
+    res.json({ ok: true, reply: r.choices[0].message.content.trim(), model: "llama-3.3-70b-versatile" });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, status: err.status });
+  }
+});
+
 app.post("/api/savekey", (req, res) => {
   const { key } = req.body;
   if (!key || key.length < 10) return res.status(400).json({ error: "金鑰無效，請確認完整複製" });
