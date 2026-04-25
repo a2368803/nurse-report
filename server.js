@@ -221,7 +221,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
   for (let i = 0; i < chunks.length; i++) {
     emit(`  → 翻譯第 ${i + 1}/${chunks.length} 段`);
     const translated = await callGroqText(
-      groq, textModel,
+      groq, fastModel,
       PROMPT_TRANSLATE_CHUNK + chunks[i],
       2000, emit, `翻譯第 ${i+1} 段`
     );
