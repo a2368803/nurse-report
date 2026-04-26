@@ -194,7 +194,7 @@ function splitChunks(text, maxChars = 900) {
   return chunks;
 }
 
-async function groqRetry(fn, emit, label, maxRetries = 3) {
+async function groqRetry(fn, emit, label, maxRetries = 10) {
   let attempt = 0;
   while (true) {
     try {
@@ -204,18 +204,26 @@ async function groqRetry(fn, emit, label, maxRetries = 3) {
       const msg = (err?.message || "").toLowerCase();
       const isRateLimit = status === 429 || msg.includes("rate") || msg.includes("limit") || msg.includes("quota");
       const isOverload  = status === 503 || status === 500 || msg.includes("overload") || msg.includes("unavailable");
+
       if (isTPDError(err)) {
-        // Daily quota — wait for Groq's specified reset time then retry (no limit)
+        // Daily quota — wait for Groq's specified reset time, no attempt limit
         const waitMs = parseRetryAfter(err.message || "") || 35 * 60 * 1000;
         const waitMin = Math.ceil(waitMs / 60000);
         if (emit) emit(`⏳ ${label} 每日用量已達上限，等待 ${waitMin} 分鐘後自動繼續，請勿關閉頁面...`);
         await sleep(waitMs + 8000);
+        attempt = 0; // reset attempt counter after TPD wait so TPM retries start fresh
         continue;
       }
-      if ((isRateLimit || isOverload) && attempt < maxRetries) {
-        const wait = isRateLimit ? 60000 : 15000;
-        if (emit) emit(`⏳ ${label} 遇到限流，等待 ${wait/1000}s 後重試（第 ${attempt+1} 次）...`);
-        await sleep(wait);
+
+      if (isRateLimit && attempt < maxRetries) {
+        // TPM or other per-minute limits — parse Groq's retry-after, fallback 60s
+        const waitMs = parseRetryAfter(err.message || "") || 60000;
+        if (emit) emit(`⏳ ${label} 遇到限流，等待 ${Math.ceil(waitMs/1000)}s 後重試（第 ${attempt+1}/${maxRetries} 次）...`);
+        await sleep(waitMs);
+        attempt++;
+      } else if (isOverload && attempt < maxRetries) {
+        if (emit) emit(`⏳ ${label} 伺服器繁忙，等待 15s 後重試（第 ${attempt+1}/${maxRetries} 次）...`);
+        await sleep(15000);
         attempt++;
       } else {
         throw err;
