@@ -91,6 +91,21 @@ implement      → 執行、落實
 原文：
 `;
 
+const PROMPT_POLISH_CHUNK = `你是台灣護理學術期刊資深編輯。以下是一段中文翻譯初稿，請進行最後潤稿，使其達到期刊發表水準。
+
+【潤稿重點】
+① 消除所有剩餘翻譯腔，使讀來如中文原創
+② 句子冗長者適當拆分，句意重複者合併精簡
+③ 連接詞與語氣詞自然流暢（然而、此外、因此、值得注意的是）
+④ 絕對不改變任何資訊內容，只改善表達方式
+⑤ 保留所有括號內的英文術語注釋
+⑥ 保留原有段落分隔
+
+只輸出潤稿後的純文字，不加任何說明或標題。
+
+初稿：
+`;
+
 const PROMPT_TITLE = `根據以下護理文章的中文翻譯，回傳純 JSON（不加 markdown）：
 {"title":"英文標題","title_zh":"中文標題","source_summary":"原文主旨摘要（繁體中文2-3句）"}
 文章翻譯：
@@ -235,18 +250,17 @@ async function callGroqJSON(groq, model, prompt, maxTokens, emit, label) {
 }
 
 // generateReport accepts an optional SSE writer for real-time progress
-async function generateReport(textContent, imagePaths, sendProgress, isPremium = false) {
+async function generateReport(textContent, imagePaths, sendProgress) {
   const emit = (msg) => { console.log(msg); if (sendProgress) sendProgress(msg); };
 
   const key = getApiKey();
   if (!key) throw new Error("尚未設定 API Key，請至設定頁面輸入");
 
   const groq = new Groq({ apiKey: key });
-  const visionModel  = "meta-llama/llama-4-scout-17b-16e-instruct";
-  const textModel    = "llama-3.3-70b-versatile";  // 100K TPD
-  const fastModel    = "llama-3.1-8b-instant";     // 500K TPD
-  const transModel   = isPremium ? textModel : fastModel;
-  emit(isPremium ? "🏆 高級翻譯模式（70b）" : "⚡ 普通翻譯模式（8b）");
+  const visionModel = "meta-llama/llama-4-scout-17b-16e-instruct";
+  const textModel   = "llama-3.3-70b-versatile";  // 100K TPD — used for all steps
+  const fastModel   = "llama-3.1-8b-instant";     // 500K TPD — title/summary only
+  emit("✨ 高品質模式（70b 全程）");
   const extractPrompt = "請完整、逐字識別圖片中的所有文字內容，保留原始段落結構與標點，只輸出純文字，不要任何說明或評論。";
 
   // ── Step 1: Extract text from each image SEPARATELY ──
@@ -285,7 +299,7 @@ async function generateReport(textContent, imagePaths, sendProgress, isPremium =
     emit(`✅ 圖片文字識別完成（總計 ${rawContent.length} 字）`);
   }
 
-  // ── Step 2: Chunk & translate (完整逐段翻譯) ──
+  // ── Step 2: Chunk & translate ──
   const chunks = splitChunks(rawContent, 800);
   emit(`🌐 開始翻譯（共 ${chunks.length} 段）...`);
   const translatedParts = [];
@@ -296,16 +310,35 @@ async function generateReport(textContent, imagePaths, sendProgress, isPremium =
       ? `【前段翻譯結尾（術語一致性參考，請勿重複輸出此段）】\n${prevTranslated.slice(-200)}\n\n`
       : "";
     const prompt = PROMPT_TRANSLATE_CHUNK.replace("原文：\n", ctxNote + "原文：\n") + chunks[i];
-    const translated = await callGroqText(groq, transModel, prompt, 2000, emit, `翻譯第 ${i+1} 段`);
+    const translated = await callGroqText(groq, textModel, prompt, 2000, emit, `翻譯第 ${i+1} 段`);
     prevTranslated = translated;
     translatedParts.push(translated);
     if (i < chunks.length - 1) await sleep(3000);
   }
+  emit(`✅ 翻譯完成（共 ${translatedParts.join("\n\n").length} 字）`);
 
-  const fullTranslation = translatedParts.join("\n\n");
-  emit(`✅ 翻譯完成（共 ${fullTranslation.length} 字）`);
+  // ── Step 3: Polish translation ──
+  await sleep(3000);
+  const polishChunks = splitChunks(translatedParts.join("\n\n"), 1000);
+  emit(`✍️ 潤稿中（共 ${polishChunks.length} 段）...`);
+  const polishedParts = [];
+  let prevPolished = "";
+  for (let i = 0; i < polishChunks.length; i++) {
+    emit(`  → 潤稿第 ${i + 1}/${polishChunks.length} 段`);
+    const ctxNote = prevPolished
+      ? `【前段潤稿結尾（語氣銜接參考，請勿重複輸出此段）】\n${prevPolished.slice(-200)}\n\n`
+      : "";
+    const prompt = PROMPT_POLISH_CHUNK.replace("初稿：\n", ctxNote + "初稿：\n") + polishChunks[i];
+    const polished = await callGroqText(groq, textModel, prompt, 2000, emit, `潤稿第 ${i+1} 段`);
+    prevPolished = polished;
+    polishedParts.push(polished);
+    if (i < polishChunks.length - 1) await sleep(3000);
+  }
 
-  // ── Step 3: Title + summary ──
+  const fullTranslation = polishedParts.join("\n\n");
+  emit(`✅ 潤稿完成（共 ${fullTranslation.length} 字）`);
+
+  // ── Step 4: Title + summary ──
   await sleep(3000);
   emit("📝 生成標題與摘要...");
   const titleData = await callGroqJSON(groq, fastModel, PROMPT_TITLE + fullTranslation.slice(0, 1500), 500, emit, "標題生成");
@@ -440,7 +473,6 @@ const progressClients = new Map();
 app.post("/generate", upload.array("files", 10), async (req, res) => {
   const textContent = (req.body.text_content || "").trim();
   const progressId  = req.body.progress_id || "";
-  const isPremium   = req.body.trans_mode === "premium";
   const files = req.files || [];
   if (!textContent && !files.length) return res.status(400).json({ error: "請上傳圖檔或輸入文字內容" });
 
@@ -458,7 +490,7 @@ app.post("/generate", upload.array("files", 10), async (req, res) => {
   };
 
   try {
-    const report = await generateReport(extraText || null, imagePaths, sendProgress, isPremium);
+    const report = await generateReport(extraText || null, imagePaths, sendProgress);
     res.json({ success: true, report });
   } catch (err) {
     console.error(err);
