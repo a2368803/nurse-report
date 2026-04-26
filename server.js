@@ -76,6 +76,16 @@ implement      → 執行、落實
 ✗ 被動語態堆疊（「被發現」→「發現」、「被認為」→「認為」）
 ✗ 「這個研究」→「本研究」
 
+【同義詞精確度 — 非常重要】
+英文近義詞在學術文章中代表不同語意，必須用不同中文詞精確對應，不可合併成同一個詞：
+· study / research / trial / investigation → 研究 / 研究 / 試驗 / 調查（依原文選用）
+· assess / evaluate / measure / examine → 評估 / 評量 / 測量 / 檢查
+· significant / notable / substantial / considerable → 顯著 / 值得注意 / 相當大 / 相當
+· decrease / reduce / alleviate / minimize → 下降 / 減少 / 緩解 / 降至最低
+· improve / enhance / promote / increase → 改善 / 增強 / 促進 / 增加
+· show / indicate / suggest / demonstrate → 顯示 / 指出 / 顯示 / 證明
+保留作者刻意選用特定詞彙的語意微差，不可因為「意思差不多」就用同一個中文詞帶過。
+
 只輸出翻譯結果純文字，不加任何說明或標題。
 
 原文：
@@ -279,9 +289,15 @@ async function generateReport(textContent, imagePaths, sendProgress, isPremium =
   const chunks = splitChunks(rawContent, 800);
   emit(`🌐 開始翻譯（共 ${chunks.length} 段）...`);
   const translatedParts = [];
+  let prevTranslated = "";
   for (let i = 0; i < chunks.length; i++) {
     emit(`  → 翻譯第 ${i + 1}/${chunks.length} 段`);
-    const translated = await callGroqText(groq, transModel, PROMPT_TRANSLATE_CHUNK + chunks[i], 2000, emit, `翻譯第 ${i+1} 段`);
+    const ctxNote = prevTranslated
+      ? `【前段翻譯結尾（術語一致性參考，請勿重複輸出此段）】\n${prevTranslated.slice(-200)}\n\n`
+      : "";
+    const prompt = PROMPT_TRANSLATE_CHUNK.replace("原文：\n", ctxNote + "原文：\n") + chunks[i];
+    const translated = await callGroqText(groq, transModel, prompt, 2000, emit, `翻譯第 ${i+1} 段`);
+    prevTranslated = translated;
     translatedParts.push(translated);
     if (i < chunks.length - 1) await sleep(3000);
   }
