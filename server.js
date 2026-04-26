@@ -187,8 +187,16 @@ async function callGroqText(groq, model, prompt, maxTokens, emit, label) {
 }
 
 async function callGroqJSON(groq, model, prompt, maxTokens, emit, label) {
-  const raw = await callGroqText(groq, model, prompt, maxTokens, emit, label);
-  return safeParseJSON(raw);
+  return groqRetry(async () => {
+    const completion = await groq.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+    });
+    return safeParseJSON(completion.choices[0].message.content.trim());
+  }, emit, label || "JSON模型");
 }
 
 // generateReport accepts an optional SSE writer for real-time progress
