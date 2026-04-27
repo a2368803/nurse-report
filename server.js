@@ -325,7 +325,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
   }
   emit(`✅ 翻譯完成（共 ${translatedParts.join("\n\n").length} 字）`);
 
-  // ── Step 3: Polish translation ──
+  // ── Step 3: Polish translation (8b — saves 70b quota) ──
   await sleep(3000);
   const polishChunks = splitChunks(translatedParts.join("\n\n"), 1000);
   emit(`✍️ 潤稿中（共 ${polishChunks.length} 段）...`);
@@ -337,7 +337,7 @@ async function generateReport(textContent, imagePaths, sendProgress) {
       ? `【前段潤稿結尾（語氣銜接參考，請勿重複輸出此段）】\n${prevPolished.slice(-200)}\n\n`
       : "";
     const prompt = PROMPT_POLISH_CHUNK.replace("初稿：\n", ctxNote + "初稿：\n") + polishChunks[i];
-    const polished = await callGroqText(groq, textModel, prompt, 2000, emit, `潤稿第 ${i+1} 段`);
+    const polished = await callGroqText(groq, fastModel, prompt, 2000, emit, `潤稿第 ${i+1} 段`);
     prevPolished = polished;
     polishedParts.push(polished);
     if (i < polishChunks.length - 1) await sleep(3000);
