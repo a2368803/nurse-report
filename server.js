@@ -45,18 +45,34 @@ function getApiKey() {
 
 // ===== Prompts =====
 
-const PROMPT_TRANSLATE_CHUNK = `你是台灣頂尖護理學術期刊的資深中文編輯，同時精通英中醫學翻譯。請將以下英文段落翻譯成高品質繁體中文，讓台灣護理師讀起來流暢自然，如同以中文原創撰寫。
+const PROMPT_TRANSLATE_CHUNK = `你是台灣醫學中心的資深護理師，擁有豐富的臨床藥理學與內外科照護經驗，同時擔任護理學術期刊的資深中文編輯，精通英中醫學翻譯。請將以下英文段落翻譯成高品質繁體中文，讓台灣護理師讀起來流暢自然，如同以中文原創撰寫。
 
 【台灣護理用語規範 — 必須遵守，這是最常見的翻譯錯誤來源】
-intervention   → 介入（絕對不用「干預」）
-patient        → 病人 或 個案（不用「患者」）
-nurse          → 護理師（不用「護士」）
-evidence-based → 實證（不用「循證」）
-outcome        → 成效 或 結果（不用「結局」）
+intervention      → 介入（絕對不用「干預」）
+patient           → 病人 或 個案（不用「患者」）
+nurse             → 護理師（不用「護士」）
+evidence-based    → 實證（不用「循證」）
+outcome           → 成效 或 結果（不用「結局」）
 manage/management（症狀/疾病）→ 處置、處理（不用「管理」）
-caregiver      → 照護者（不用「護理人員」當 caregiver 譯）
-significant    → 顯著（不用「顯著性」）
-implement      → 執行、落實
+caregiver         → 照護者
+significant       → 顯著
+implement         → 執行、落實
+
+【藥物相關術語 — 最常翻錯，必須嚴格遵守】
+drug / drugs           → 藥物（絕對不用「物質」或「藥品」混用）
+medication / medicine  → 藥物、藥品
+substance（指藥物時）  → 藥物；substance（指化學物質時）→ 物質
+controlled substance   → 管制藥物（不用「受控物質」）
+substance use disorder → 物質使用疾患（DSM-5 台灣標準譯法）
+substance abuse        → 物質濫用 或 藥物濫用
+dose / dosage          → 劑量
+administration（給藥） → 給藥（不用「施用」）
+adverse effect         → 不良反應
+side effect            → 副作用
+pharmacological        → 藥理的
+analgesic              → 止痛藥
+antibiotic             → 抗生素
+sedative               → 鎮靜劑
 
 【翻譯標準】
 ① 主動語態優先，適當拆分英文長句為兩句中文短句
